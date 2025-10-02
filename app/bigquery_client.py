@@ -1,4 +1,5 @@
 import os
+import io
 from google.cloud import bigquery
 from google.api_core import exceptions
 import logging
@@ -103,6 +104,22 @@ class BigQueryClient:
 
 
 
+    def load_from_dataframe_buffer(self, table_name: str, dataframe, write_disposition="WRITE_APPEND"):
+
+        table_ref = self.get_table_ref(table_name)
+        buffer = io.BytesIO()
+        dataframe.to_parquet(buffer, engine='pyarrow', index=False)
+        buffer.seek(0)
+        
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=write_disposition,
+            source_format=bigquery.SourceFormat.PARQUET,
+        )
+        
+        job = self.client.load_table_from_file(buffer, table_ref, job_config=job_config)
+        job.result()
+        logger.info(f"Loaded {job.output_rows} rows into {table_name}")
+        return job.output_rows
 
     
     def table_exists(self, table_name: str):
