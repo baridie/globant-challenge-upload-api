@@ -3,6 +3,7 @@ from typing import List
 import pandas as pd
 import io
 from datetime import datetime
+import pytz
 from ..bigquery_client import bq_client
 import logging
 
@@ -33,12 +34,15 @@ async def upload_departments(file: UploadFile = File(...)):
         logger.info('File to df')
         print(df)
         
-        if 'id' not in df.columns or 'department' not in df.columns:
-            raise HTTPException(
-                status_code=400, 
-                detail="CSV must have 'id' and 'department' columns"
-            )
-              
+        required_cols = ["id", "department"]
+
+        if not set(required_cols).intersection(set(df.columns)):
+            df = pd.read_csv(io.StringIO(contents.decode('utf-8')), header=None)
+            df.columns = required_cols[:len(df.columns)] 
+        
+        logger.info('New df')
+        print(df)
+
         if len(df) == 0:
             raise HTTPException(
                 status_code=400, 
@@ -47,6 +51,9 @@ async def upload_departments(file: UploadFile = File(...)):
         
         df['id'] = df['id'].astype(int)
         df['department'] = df['department'].astype(str).str.strip()
+
+        ba_tz = pytz.timezone("America/Argentina/Buenos_Aires")
+        df['loaded_at'] = pd.Timestamp.now(tz=ba_tz)
         
         logger.info('Prepared to upload to BigQuery')
         rows_inserted = bq_client.load_from_dataframe('departments', df)
