@@ -47,7 +47,8 @@ class BigQueryClient:
         
         job_config = bigquery.LoadJobConfig(
             write_disposition=write_disposition,
-            autodetect=False
+            autodetect=False,
+            allow_jagged_rows=False
         )
         
         try:
