@@ -20,12 +20,17 @@ async def upload_departments(file: UploadFile = File(...)):
     - department (string): Department name
     
     """
+
+    logger.info('Check file extension')
     if not file.filename.lower().endswith('.csv'):
         raise HTTPException(status_code=400, detail="File must be a CSV")
     
     try:
+        logger.info('Read file')
         contents = await file.read()
+        logger.info('File already read')
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        logger.info('File to df')
         
         if 'id' not in df.columns or 'department' not in df.columns:
             raise HTTPException(
