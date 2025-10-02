@@ -64,6 +64,46 @@ class BigQueryClient:
         except Exception as e:
             logger.error(f"Error loading dataframe into {table_name}: {str(e)}")
             raise Exception(f"Error loading dataframe: {str(e)}")
+
+
+    def load_from_dataframe_gbq(self, table_name: str, dataframe, write_disposition="WRITE_APPEND", schema=None):
+        """
+        Load data from pandas DataFrame to BigQuery using to_gbq
+        """
+        try:
+            disposition_map = {
+                "WRITE_APPEND": "append",
+                "WRITE_TRUNCATE": "replace",
+                "WRITE_EMPTY": "fail"
+            }
+            
+            if_exists = disposition_map.get(write_disposition, "append")
+            
+            gbq_kwargs = {
+                'destination_table': f"{self.dataset_id}.{table_name}",
+                'project_id': f"{self.project_id}",
+                'if_exists': if_exists,
+                'progress_bar': False,
+            }
+            
+            if schema:
+                gbq_kwargs['table_schema'] = schema
+            
+            dataframe.to_gbq(**gbq_kwargs)
+            
+            row_count = len(dataframe)
+            logger.info(f"Loaded {row_count} rows into {table_name} using to_gbq")
+            
+            return row_count
+            
+        except Exception as e:
+            logger.error(f"Error loading dataframe into {table_name}: {str(e)}")
+            raise Exception(f"Error loading dataframe: {str(e)}")
+
+
+
+
+
     
     def table_exists(self, table_name: str):
         """Check if table exists"""

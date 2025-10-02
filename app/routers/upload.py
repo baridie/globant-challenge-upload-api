@@ -159,7 +159,7 @@ async def upload_employees(file: UploadFile = File(...)):
         ba_tz = pytz.timezone("America/Argentina/Buenos_Aires")
         df['loaded_at'] = pd.Timestamp.now(tz=ba_tz)
         
-        rows_inserted = bq_client.load_from_dataframe('hired_employees', df)
+        rows_inserted = bq_client.load_from_dataframe_gbq('hired_employees', df)
         
         logger.info(f"Successfully uploaded {rows_inserted} employees")
         return {
