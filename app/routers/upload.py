@@ -31,6 +31,7 @@ async def upload_departments(file: UploadFile = File(...)):
         logger.info('File already read')
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         logger.info('File to df')
+        print(df)
         
         if 'id' not in df.columns or 'department' not in df.columns:
             raise HTTPException(
