@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Globant Upload API",
-    description="Data Upload API for Globant Challenge - Handles CSV uploads and batch insertions",
+    description="Data Upload API for Globant Challenge - Handles CSV uploads insertions",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
