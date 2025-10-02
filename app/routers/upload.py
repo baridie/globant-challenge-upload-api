@@ -152,7 +152,7 @@ async def upload_employees(file: UploadFile = File(...)):
         
         df['id'] = df['id'].astype(int)
         df['name'] = df['name'].astype(str).str.strip()
-        df['datetime'] = pd.to_datetime(df['datetime'])
+        df['datetime'] = pd.to_datetime(df['datetime']).dt.round('ms')
         df['department_id'] = df['department_id'].astype('Int64')
         df['job_id'] = df['job_id'].astype('Int64')
 
