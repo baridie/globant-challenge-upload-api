@@ -27,12 +27,8 @@ async def upload_departments(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File must be a CSV")
     
     try:
-        logger.info('Read file')
         contents = await file.read()
-        logger.info('File already read')
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
-        logger.info('File to df')
-        print(df)
         
         required_cols = ["id", "department"]
 
@@ -40,9 +36,6 @@ async def upload_departments(file: UploadFile = File(...)):
             df = pd.read_csv(io.StringIO(contents.decode('utf-8')), header=None)
             df.columns = required_cols[:len(df.columns)] 
         
-        logger.info('New df')
-        print(df)
-
         if len(df) == 0:
             raise HTTPException(
                 status_code=400, 
@@ -89,12 +82,13 @@ async def upload_jobs(file: UploadFile = File(...)):
         contents = await file.read()
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         
-        if 'id' not in df.columns or 'job' not in df.columns:
-            raise HTTPException(
-                status_code=400, 
-                detail="CSV must have 'id' and 'job' columns"
-            )
-        
+        required_cols = ["id", "job"]
+
+        if not set(required_cols).intersection(set(df.columns)):
+            df = pd.read_csv(io.StringIO(contents.decode('utf-8')), header=None)
+            df.columns = required_cols[:len(df.columns)] 
+
+
         if len(df) == 0:
             raise HTTPException(
                 status_code=400, 
@@ -103,6 +97,9 @@ async def upload_jobs(file: UploadFile = File(...)):
         
         df['id'] = df['id'].astype(int)
         df['job'] = df['job'].astype(str).str.strip()
+
+        ba_tz = pytz.timezone("America/Argentina/Buenos_Aires")
+        df['loaded_at'] = pd.Timestamp.now(tz=ba_tz)
         
         logger.info('Prepared to upload to BigQuery')
         rows_inserted = bq_client.load_from_dataframe('jobs', df)
@@ -142,12 +139,10 @@ async def upload_employees(file: UploadFile = File(...)):
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         
         required_cols = ['id', 'name', 'datetime', 'department_id', 'job_id']
-        if not all(col in df.columns for col in required_cols):
-            raise HTTPException(
-                status_code=400, 
-                detail=f"CSV must have columns: {required_cols}"
-            )
-        
+
+        if not set(required_cols).intersection(set(df.columns)):
+            df = pd.read_csv(io.StringIO(contents.decode('utf-8')), header=None)
+            df.columns = required_cols[:len(df.columns)] 
         
         if len(df) == 0:
             raise HTTPException(
@@ -160,6 +155,9 @@ async def upload_employees(file: UploadFile = File(...)):
         df['datetime'] = pd.to_datetime(df['datetime'])
         df['department_id'] = df['department_id'].astype('Int64')
         df['job_id'] = df['job_id'].astype('Int64')
+
+        ba_tz = pytz.timezone("America/Argentina/Buenos_Aires")
+        df['loaded_at'] = pd.Timestamp.now(tz=ba_tz)
         
         rows_inserted = bq_client.load_from_dataframe('hired_employees', df)
         
@@ -176,3 +174,48 @@ async def upload_employees(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Error uploading employees: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.post("/upload/batch/{table_name}")
+async def upload_batch(table_name: str, data: List[dict]):
+    """
+    Upload batch data (1-1000 rows) as JSON
+    Table name must be: departments, jobs, or hired_employees
+    """
+    if table_name not in ['departments', 'jobs', 'hired_employees']:
+        raise HTTPException(status_code=400, detail="Invalid table name")
+    
+    if len(data) < 1 or len(data) > 1000:
+        raise HTTPException(
+            status_code=400, 
+            detail="Batch size must be between 1 and 1000"
+        )
+    
+    try:
+        df = pd.DataFrame(data)
+        
+        if table_name == 'departments':
+            df['id'] = df['id'].astype(int)
+            df['department'] = df['department'].str.strip()
+        
+        elif table_name == 'jobs':
+            df['id'] = df['id'].astype(int)
+            df['job'] = df['job'].str.strip()
+        
+        elif table_name == 'hired_employees':
+            df['id'] = df['id'].astype(int)
+            df['name'] = df['name'].str.strip()
+            df['datetime'] = pd.to_datetime(df['datetime'])
+            df['department_id'] = df['department_id'].astype('Int64')
+            df['job_id'] = df['job_id'].astype('Int64')
+
+        ba_tz = pytz.timezone("America/Argentina/Buenos_Aires")
+        df['loaded_at'] = pd.Timestamp.now(tz=ba_tz)
+        
+        rows_inserted = bq_client.load_from_dataframe(table_name, df)
+        
+        return {
+            "message": f"Successfully inserted {rows_inserted} rows into {table_name}",
+            "rows": rows_inserted
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
